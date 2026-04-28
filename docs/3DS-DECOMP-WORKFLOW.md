@@ -22,8 +22,17 @@ for decrypted local 3DS executables/modules only.
 5. For games with CRO/CRS modules, import the static CRS first, then import
    related CRO modules and run the CRO linking script against the open project
    programs.
-6. For NCCH/CXI images that Ghidra exposes as a filesystem rather than a
-   direct program, extract private ExeFS members locally:
+6. For NCCH/CXI/CIA images that Ghidra exposes as a filesystem rather than a
+   direct program, import `/exefs/code.bin` directly in the Ghidra UI when you
+   want the mapped ARM program. The loader exposes `code.bin` as a friendly
+   alias for ExeFS `.code`, reads the parent NCCH ExHeader, maps `.text`,
+   `.rodata`, `.data`, and `.bss`, seeds code-set anchors, and writes ExHeader
+   metadata to Program Info. Whole-container recursive imports are useful for
+   smoke testing but will also walk RomFS assets and can produce harmless
+   "no load spec" noise that is not relevant to decomp work.
+
+   If you need payload-free local manifests or want to validate extracted
+   private files outside the UI, extract private ExeFS members locally:
 
    ```powershell
    .\tests\extract-cxi-exefs.ps1 -InputPath "C:\path\to\local\decrypted.cxi"
