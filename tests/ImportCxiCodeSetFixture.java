@@ -16,6 +16,7 @@ import ghidra.app.util.opinion.LoadResults;
 import ghidra.formats.gfilesystem.FileSystemRef;
 import ghidra.formats.gfilesystem.FileSystemService;
 import ghidra.formats.gfilesystem.GFile;
+import ghidra.framework.options.Options;
 import ghidra.program.model.listing.Program;
 
 public class ImportCxiCodeSetFixture extends GhidraScript {
@@ -48,10 +49,26 @@ public class ImportCxiCodeSetFixture extends GhidraScript {
 						.log(log)
 						.monitor(monitor)
 						.load()) {
+				Program program = loadResults.getPrimary().getDomainObject(this);
+				applyAnalyzerPreset(program);
 				loadResults.getPrimary().save(monitor);
 			}
 
 			println(log.toString());
 		}
+	}
+
+	private void applyAnalyzerPreset(Program program) {
+		Options analysis = program.getOptions(Program.ANALYSIS_PROPERTIES);
+		analysis.setBoolean("Decompiler Switch Analysis", false);
+		analysis.setBoolean("ARM Constant Reference Analyzer", true);
+		analysis.setBoolean("Reference", true);
+		analysis.setBoolean("Shared Return Calls", true);
+		analysis.setBoolean("Stack", true);
+		analysis.setBoolean("Subroutine References", true);
+
+		Options info = program.getOptions(Program.PROGRAM_INFO);
+		info.setString("3DS Analyzer Preset", "safe-large-3ds-arm");
+		info.setBoolean("3DS Analyzer Preset Disable Switch Analysis", true);
 	}
 }

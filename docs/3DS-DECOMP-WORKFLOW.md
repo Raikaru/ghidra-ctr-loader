@@ -59,8 +59,9 @@ for decrypted local 3DS executables/modules only.
    The code-set workflow also seeds confirmed anchors before analysis:
    `ctr_entry`, `ctr_text_start`, `ctr_rodata_start`, `ctr_data_start`, and
    `ctr_bss_start`. Direct CXI/CIA imports also add known 3DS dependency
-   module names as external libraries and add repeatable comments to known
-   ARM SVC instructions in `.text`.
+   module names and service ACL names as external libraries, add repeatable
+   comments to known ARM SVC instructions in `.text`, and apply the
+   `safe-large-3ds-arm` analyzer preset.
 
    For a quick raw baseline, import `.code` as ARM:
 
@@ -108,6 +109,24 @@ for decrypted local 3DS executables/modules only.
    ```powershell
    .\tests\summarize-headless-log.ps1 `
      -LogPath ".local-test\structure-export\game.headless.log"
+   ```
+
+   Starter projects can also generate a payload-safe quality report that joins
+   the project manifest, ExeFS metadata, RomFS counts, module discovery, and
+   headless warning summary:
+
+   ```powershell
+   .\tests\new-3ds-project-quality-report.ps1 `
+     -ProjectManifest ".local-test\decomp-projects\game\project.structure.json"
+   ```
+
+   Generate a handoff note for a decomp agent from the same structure-only
+   metadata:
+
+   ```powershell
+   .\tests\new-3ds-decomp-handoff.ps1 `
+     -ProjectManifest ".local-test\decomp-projects\game\project.structure.json" `
+     -TargetName "Game Name"
    ```
 
 9. List RomFS metadata without extracting file payload:

@@ -1,5 +1,14 @@
 # Release Notes
 
+## Unreleased
+
+- Adds payload-safe project quality reports and handoff generation for local
+  3DS decomp starter projects.
+- Applies a conservative `safe-large-3ds-arm` analyzer preset during code-set
+  project/import helper flows.
+- Seeds service access control names as external libraries for faster service
+  wrapper identification.
+
 ## v1.3.0
 
 - Adds an all-in-one local 3DS decomp starter script for decrypted CXI/CCI/.3ds
