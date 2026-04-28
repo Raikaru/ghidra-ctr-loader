@@ -1,30 +1,102 @@
-name: Build
+name: Build and Release
 
 on:
   push:
-    branches:
-      - master
+    branches: [master, main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      ghidra_version:
+        description: 'Ghidra release to build against'
+        required: false
+        default: '12.0.4'
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        ghidra: [ "11.0" ]
+    env:
+      GHIDRA_VERSION: ${{ github.event.inputs.ghidra_version || '12.0.4' }}
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up JDK 11
-        uses: actions/setup-java@v2
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          java-version: 17
-          distribution: 'adopt'
-      - uses: er28-0652/setup-ghidra@master
+          distribution: temurin
+          java-version: '21'
+
+      - name: Resolve Ghidra release URL
+        id: resolve
+        run: |
+          set -euo pipefail
+          release_json="$(curl -fsSL https://api.github.com/repos/NationalSecurityAgency/ghidra/releases)"
+          url="$(printf '%s' "$release_json" \
+            | jq -r --arg v "$GHIDRA_VERSION" \
+                '[.[] | .assets[] | select(.name | test("ghidra_" + $v + "_PUBLIC_[0-9]+\\.zip$"))][0].browser_download_url')"
+          if [ -z "$url" ] || [ "$url" = "null" ]; then
+            echo "Could not resolve Ghidra release ${GHIDRA_VERSION}" >&2
+            exit 1
+          fi
+          echo "ghidra_url=${url}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Ghidra distribution
+        id: cache-ghidra
+        uses: actions/cache@v4
         with:
-          version: ${{ matrix.ghidra }}
-      - uses: gradle/gradle-build-action@v2
+          path: ghidra
+          key: ghidra-${{ env.GHIDRA_VERSION }}
+
+      - name: Download and unpack Ghidra
+        if: steps.cache-ghidra.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ghidra
+          curl -fL --retry 3 -o ghidra.zip "${{ steps.resolve.outputs.ghidra_url }}"
+          unzip -q ghidra.zip -d ghidra
+          rm ghidra.zip
+          inner="$(find ghidra -maxdepth 1 -mindepth 1 -type d -name 'ghidra_*' | head -n1)"
+          shopt -s dotglob
+          mv "$inner"/* ghidra/
+          rmdir "$inner"
+
+      - name: Build extension
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          GHIDRA_INSTALL_DIR="$PWD/ghidra" ./gradlew --no-daemon buildExtension
+
+      - name: Prepare artifact metadata
+        id: artifact
+        run: |
+          set -euo pipefail
+          zip_path="$(ls -1 dist/*ghidra-ctr-loader.zip | tail -n1)"
+          sha256sum "$zip_path" | tee "$zip_path.sha256"
+          echo "zip_path=$zip_path" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$(basename "$zip_path")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
         with:
-          arguments: buildExtension
-      - name: Upload extension
-        uses: kittaakos/upload-artifact-as-is@v0
-        with:
-          path: dist/*.zip
+          name: ${{ steps.artifact.outputs.zip_name }}
+          path: |
+            ${{ steps.artifact.outputs.zip_path }}
+            ${{ steps.artifact.outputs.zip_path }}.sha256
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --notes "Ghidra CTR Loader release built against Ghidra ${GHIDRA_VERSION}. Original project: Martmists-GH/ghidra-ctr-loader."
+          gh release upload "$GITHUB_REF_NAME" \
+            "${{ steps.artifact.outputs.zip_path }}" \
+            "${{ steps.artifact.outputs.zip_path }}.sha256" \
+            --clobber

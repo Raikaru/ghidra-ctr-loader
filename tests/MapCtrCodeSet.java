@@ -105,7 +105,7 @@ public class MapCtrCodeSet extends GhidraScript {
         block.setRead(read);
         block.setWrite(write);
         block.setExecute(execute);
-        return offset + size;
+        return offset + consumed;
     }
 
     private Segment segment(JsonObject json) {
