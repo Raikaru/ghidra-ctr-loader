@@ -1,6 +1,7 @@
 package com.martmists.ctr.loader.loader
 
 import com.martmists.ctr.ext.reader
+import com.martmists.ctr.loader.filesystem.CIAFileSystem
 import com.martmists.ctr.loader.format.CRO0Header
 import com.martmists.ctr.loader.format.NCCHExHeader
 import ghidra.app.util.MemoryBlockUtils
@@ -34,7 +35,7 @@ class CRSLoader : CROLoader() {
     }
 
     override fun createSegmentsFromCXI(provider: ByteProvider, program: Program, monitor: TaskMonitor, log: MessageLog) {
-        val cxiProvider = FileSystemService.getInstance().getByteProvider(provider.fsrl.fs.container, true, monitor)
+        val ncchProvider = getNcchProvider(provider, monitor)
         val codeBinProvider = FileSystemService.getInstance().getByteProvider(provider.fsrl.fs.withPath("/exefs/.code"), true, monitor)
 
         provider.getInputStream(0).reader crs@{
@@ -53,7 +54,7 @@ class CRSLoader : CROLoader() {
             val nameBytes = MemoryBlockUtils.createFileBytes(program, provider, header.moduleNameOffset.toLong(), header.moduleNameSize.toLong(), monitor)
             MemoryBlockUtils.createInitializedBlock(program, false, "name", program.imageBase.add(header.moduleNameOffset.toLong()), nameBytes, 0, header.moduleNameSize.toLong(), "", null, true, true, false, log)
 
-            cxiProvider.getInputStream(0).reader {
+            ncchProvider.getInputStream(0).reader {
                 seek(0x200)
                 val ncchEx = read<NCCHExHeader>()
 
@@ -105,6 +106,18 @@ class CRSLoader : CROLoader() {
                     }
                 }
             }
+        }
+    }
+
+    private fun getNcchProvider(provider: ByteProvider, monitor: TaskMonitor): ByteProvider {
+        val container = provider.fsrl.fs.container
+            ?: throw IllegalStateException("CRS imports from CXI/CIA require a parent filesystem container")
+        val rawProvider = FileSystemService.getInstance().getByteProvider(container, true, monitor)
+        val containerPath = container.path.lowercase()
+        return when {
+            containerPath.endsWith(".cxi") -> rawProvider
+            containerPath.endsWith(".cia") -> CIAFileSystem.CIAByteProvider(rawProvider)
+            else -> throw IllegalStateException("Unsupported CRS parent container: ${container.path}")
         }
     }
 }
