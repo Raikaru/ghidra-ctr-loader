@@ -7,12 +7,12 @@ import com.martmists.ctr.ext.segOff
 import com.martmists.ctr.loader.format.CRO0Header
 import com.martmists.ctr.loader.struct.*
 import ghidra.app.util.MemoryBlockUtils
-import ghidra.app.util.Option
 import ghidra.app.util.bin.BinaryReader
 import ghidra.app.util.bin.ByteProvider
 import ghidra.app.util.cparser.C.CParser
 import ghidra.app.util.importer.MessageLog
 import ghidra.app.util.opinion.AbstractLibrarySupportLoader
+import ghidra.app.util.opinion.Loader
 import ghidra.app.util.opinion.LoadSpec
 import ghidra.program.model.data.DataTypeConflictHandler
 import ghidra.program.model.data.FileDataTypeManager
@@ -49,14 +49,10 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
         return loadSpecs
     }
 
-    override fun load(
-        provider: ByteProvider,
-        loadSpec: LoadSpec,
-        options: MutableList<Option>,
-        program: Program,
-        monitor: TaskMonitor,
-        log: MessageLog,
-    ) {
+    override fun load(program: Program, settings: Loader.ImporterSettings) {
+        val provider = settings.provider()
+        val monitor = settings.monitor()
+        val log = settings.log()
         createDataTypes(program)
         createSegments(program, provider, monitor, log)
         declareImportsAndExports(program, provider, monitor, log)
