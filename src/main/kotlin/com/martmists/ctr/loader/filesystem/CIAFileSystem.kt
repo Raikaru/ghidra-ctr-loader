@@ -36,17 +36,17 @@ class CIAFileSystem(fsFSRL: FSRLRoot, provider: ByteProvider, fsService: FileSys
                 val header = read<CIAHeader>()
                 align(64)
                 var pos = tell()
-                val caCert = Certificate.parse(this)
-                val ticketCert = Certificate.parse(this)
-                val tmdCert = Certificate.parse(this)
+                Certificate.parse(this)
+                Certificate.parse(this)
+                Certificate.parse(this)
                 require(tell() - pos == header.certificateChainSize.toLong()) { "Certificate chain size mismatch; expected ${header.certificateChainSize}, got ${tell() - pos}" }
                 align(64)
                 pos = tell()
-                val ticket = Ticket.parse(this)
+                Ticket.parse(this)
                 require(tell() - pos == header.ticketSize.toLong()) { "Ticket size mismatch; expected ${header.ticketSize}, got ${tell() - pos}" }
                 align(64)
                 pos = tell()
-                val tmd = readBytes(header.tmdSize)
+                readBytes(header.tmdSize)
                 require(tell() - pos == header.tmdSize.toLong()) { "TMD size mismatch; expected ${header.tmdSize}, got ${tell() - pos}" }
                 align(64)
 

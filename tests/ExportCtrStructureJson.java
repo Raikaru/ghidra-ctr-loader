@@ -21,6 +21,7 @@ public class ExportCtrStructureJson extends GhidraScript {
         field(out, "program", currentProgram.getName()).append(",");
         field(out, "language", currentProgram.getLanguageID().getIdAsString()).append(",");
         field(out, "compiler", currentProgram.getCompilerSpec().getCompilerSpecID().getIdAsString()).append(",");
+        field(out, "image_base", hex(currentProgram.getImageBase())).append(",");
         appendBlocks(out).append(",");
         appendCounts(out);
         out.append("}");
@@ -64,8 +65,18 @@ public class ExportCtrStructureJson extends GhidraScript {
         }
 
         int blocks = 0;
+        int initializedBlocks = 0;
+        int uninitializedBlocks = 0;
+        int readableBlocks = 0;
+        int writableBlocks = 0;
+        int executableBlocks = 0;
         for (MemoryBlock ignored : currentProgram.getMemory().getBlocks()) {
             blocks++;
+            if (ignored.isInitialized()) initializedBlocks++;
+            else uninitializedBlocks++;
+            if (ignored.isRead()) readableBlocks++;
+            if (ignored.isWrite()) writableBlocks++;
+            if (ignored.isExecute()) executableBlocks++;
         }
 
         String[] libraries = currentProgram.getExternalManager().getExternalLibraryNames();
@@ -73,6 +84,11 @@ public class ExportCtrStructureJson extends GhidraScript {
         out.append("\"counts\":{");
         out.append("\"functions\":").append(functions).append(",");
         out.append("\"memory_blocks\":").append(blocks).append(",");
+        out.append("\"initialized_blocks\":").append(initializedBlocks).append(",");
+        out.append("\"uninitialized_blocks\":").append(uninitializedBlocks).append(",");
+        out.append("\"readable_blocks\":").append(readableBlocks).append(",");
+        out.append("\"writable_blocks\":").append(writableBlocks).append(",");
+        out.append("\"executable_blocks\":").append(executableBlocks).append(",");
         out.append("\"symbols_total\":").append(symbols).append(",");
         out.append("\"external_libraries\":").append(libraries.length);
         out.append("},");

@@ -10,14 +10,22 @@ import ghidra.app.util.importer.MessageLog
 import ghidra.formats.gfilesystem.FileSystemService
 import ghidra.program.model.listing.Program
 import ghidra.util.task.TaskMonitor
+import java.io.IOException
 
 
 class CRSLoader : CROLoader() {
     override fun getName() = "CRS Loader"
 
     override fun isValid(provider: ByteProvider): Boolean {
+        if (provider.length() < 0x84) {
+            return false
+        }
         val reader = BinaryReader(provider, true)
-        return reader.readAsciiString(0x80, 4) == "CRO0" && provider.name.endsWith(".crs")
+        return try {
+            reader.readAsciiString(0x80, 4) == "CRO0" && provider.name.endsWith(".crs")
+        } catch (e: IOException) {
+            false
+        }
     }
 
     override fun createSegmentsFromFile(provider: ByteProvider, program: Program, monitor: TaskMonitor, log: MessageLog) {
@@ -31,6 +39,10 @@ class CRSLoader : CROLoader() {
 
         provider.getInputStream(0).reader crs@{
             val header = read<CRO0Header>()
+            requireProviderRange(provider, 0, 0x138, "CRS header")
+            requireProviderRange(provider, header.moduleNameOffset.toLong(), header.moduleNameSize.toLong(), "module name")
+            requireProviderRange(provider, header.segmentTableOffset.toLong(), header.segmentTableNum * 12L, "segment table")
+            requireProviderRange(provider, header.segmentTableOffset.toLong(), (header.dataOffset - header.segmentTableOffset).toLong(), "metadata tables")
 
             val headerBytes = MemoryBlockUtils.createFileBytes(program, provider, 0, 0x138, monitor)
             MemoryBlockUtils.createInitializedBlock(program, false, "header", program.imageBase, headerBytes, 0, 0x138, "", null, true, false, false, log)
@@ -76,6 +88,7 @@ class CRSLoader : CROLoader() {
                         0, 1, 2 -> {
                             val codeSet = codeSetMap[segmentName]!!
                             val regionSize = if (aligned) codeSet.physRegionSize * 0x1000L else codeSet.size.toLong()
+                            requireProviderRange(codeBinProvider, codeOffset, regionSize, "$segmentName code region")
                             val segmentBytes = MemoryBlockUtils.createFileBytes(program, codeBinProvider, codeOffset, regionSize, monitor)
 
                             MemoryBlockUtils.createInitializedBlock(program, false, segmentName, program.imageBase.add(codeSet.address.toLong()), segmentBytes, 0, regionSize, "", null, r, w, x, log)

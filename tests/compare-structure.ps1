@@ -40,8 +40,19 @@ function Compare-Scalar([string] $Name, $BaseValue, $NextValue) {
 
 Compare-Scalar "language" $base.language $next.language
 Compare-Scalar "compiler" $base.compiler $next.compiler
+Compare-Scalar "image_base" $base.image_base $next.image_base
 
-foreach ($name in @("functions", "memory_blocks", "symbols_total", "external_libraries")) {
+foreach ($name in @(
+    "functions",
+    "memory_blocks",
+    "initialized_blocks",
+    "uninitialized_blocks",
+    "readable_blocks",
+    "writable_blocks",
+    "executable_blocks",
+    "symbols_total",
+    "external_libraries"
+)) {
     Compare-Scalar "counts.$name" $base.counts.$name $next.counts.$name
 }
 

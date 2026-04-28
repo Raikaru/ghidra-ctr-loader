@@ -9,7 +9,7 @@ import ghidra.app.util.bin.MemoryByteProvider
 import ghidra.program.flatapi.FlatProgramAPI
 import ghidra.program.model.address.Address
 import ghidra.program.model.address.AddressSet
-import ghidra.program.model.listing.CodeUnit
+import ghidra.program.model.listing.CommentType
 import ghidra.program.model.listing.Program
 import ghidra.program.model.symbol.RefType
 import ghidra.program.model.symbol.SourceType
@@ -131,7 +131,7 @@ interface CROUtilities {
             // Create data
             symbolTable.createLabel(address, symName, SourceType.ANALYSIS)
         }
-        listing.setComment(address, CodeUnit.EOL_COMMENT, symName)
+        listing.setComment(address, CommentType.EOL, symName)
     }
 
     fun nextExportIndex(): Long
@@ -163,7 +163,7 @@ interface CROUtilities {
             // Create data reference
             externalManager.addExtLocation(moduleName, sym, moduleAddress, SourceType.ANALYSIS)
             symbolTable.createLabel(externalAddress, symName, SourceType.ANALYSIS)
-            listing.setComment(externalAddress, CodeUnit.REPEATABLE_COMMENT, "${sym}:{@program \"${module.domainFile.pathname}@${moduleAddress}\"}")
+            listing.setComment(externalAddress, CommentType.REPEATABLE, "${sym}:{@program \"${module.domainFile.pathname}@${moduleAddress}\"}")
         }
 
         return externalAddress

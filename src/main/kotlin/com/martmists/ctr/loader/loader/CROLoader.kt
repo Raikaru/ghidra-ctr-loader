@@ -15,12 +15,10 @@ import ghidra.app.util.opinion.AbstractLibrarySupportLoader
 import ghidra.app.util.opinion.Loader
 import ghidra.app.util.opinion.LoadSpec
 import ghidra.program.model.data.DataTypeConflictHandler
-import ghidra.program.model.data.FileDataTypeManager
 import ghidra.program.model.lang.LanguageCompilerSpecPair
 import ghidra.program.model.listing.Program
 import ghidra.program.model.symbol.SourceType
 import ghidra.util.task.TaskMonitor
-import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -35,8 +33,15 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
     }
 
     open fun isValid(provider: ByteProvider): Boolean {
+        if (provider.length() < 0x84) {
+            return false
+        }
         val reader = BinaryReader(provider, true)
-        return reader.readAsciiString(0x80, 4) == "CRO0" && !provider.name.endsWith(".crs")
+        return try {
+            reader.readAsciiString(0x80, 4) == "CRO0" && !provider.name.endsWith(".crs")
+        } catch (e: IOException) {
+            false
+        }
     }
 
     override fun findSupportedLoadSpecs(provider: ByteProvider): MutableCollection<LoadSpec> {
@@ -62,7 +67,6 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
 
     protected open fun createDataTypes(program: Program) {
         try {
-//            val manager = FileDataTypeManager.createFileArchive(File("/ProjectStructs${FileDataTypeManager.SUFFIX}"));
             val manager = program.dataTypeManager
 
             for (struct in listOf(
@@ -83,6 +87,14 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
             }
         } catch (e: IOException) {
             // ignore
+        }
+    }
+
+    protected fun requireProviderRange(provider: ByteProvider, offset: Long, size: Long, description: String) {
+        require(offset >= 0) { "$description has negative offset $offset" }
+        require(size >= 0) { "$description has negative size $size" }
+        require(offset <= provider.length() && offset + size <= provider.length()) {
+            "$description range ${offset.hex}..${(offset + size).hex} exceeds provider length ${provider.length().hex}"
         }
     }
 
@@ -113,6 +125,10 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
     protected open fun createSegmentsFromFile(provider: ByteProvider, program: Program, monitor: TaskMonitor, log: MessageLog) {
         provider.getInputStream(0).reader {
             val header = read<CRO0Header>()
+            requireProviderRange(provider, 0, 0x138, "CRO header")
+            requireProviderRange(provider, header.moduleNameOffset.toLong(), header.moduleNameSize.toLong(), "module name")
+            requireProviderRange(provider, header.segmentTableOffset.toLong(), header.segmentTableNum * 12L, "segment table")
+            requireProviderRange(provider, header.segmentTableOffset.toLong(), (header.dataOffset - header.segmentTableOffset).toLong(), "metadata tables")
 
             seek(header.segmentTableOffset)
             val segments = readList<CRO0Header.SegmentTableEntry>(header.segmentTableNum)
@@ -144,6 +160,7 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
 
                 when (segment.id) {
                     0, 1, 2 -> {
+                        requireProviderRange(provider, segment.offset.toLong(), segment.size.toLong(), segmentName)
                         val fileBytes = MemoryBlockUtils.createFileBytes(program, provider, segment.offset.toLong(), segment.size.toLong(), monitor)
                         MemoryBlockUtils.createInitializedBlock(program, false, segmentName, program.imageBase.add(segment.offset.toLong()), fileBytes, 0, segmentSize.toLong(), "", null, r, w, x, log)
                     }
@@ -163,6 +180,7 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
     protected open fun declareImportsAndExports(program: Program, provider: ByteProvider, monitor: TaskMonitor, log: MessageLog) {
         provider.getInputStream(0).reader {
             val header = read<CRO0Header>()
+            requireProviderRange(provider, header.importModuleTableOffset.toLong(), header.importModuleTableNum * 20L, "import module table")
 
             val numExternals = header.namedImportTableNum + header.indexedImportTableNum + header.anonymousImportTableNum
             val externalsStart = program.imageBase.add(0x0a000000)
@@ -183,6 +201,8 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
     protected fun setLabels(program: Program, provider: ByteProvider, monitor: TaskMonitor) {
         provider.getInputStream(0).reader {
             val header = read<CRO0Header>()
+            requireProviderRange(provider, header.namedExportTableOffset.toLong(), header.namedExportTableNum * 8L, "named export table")
+            requireProviderRange(provider, header.indexedExportTableOffset.toLong(), header.indexedExportTableNum * 4L, "indexed export table")
 
             for ((name, addr) in mapOf(
                 "_cro_OnLoad" to header.onLoadOffset,
@@ -221,6 +241,8 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
     protected open fun applyPatches(program: Program, provider: ByteProvider) {
         provider.getInputStream(0).reader {
             val header = read<CRO0Header>()
+            requireProviderRange(provider, header.segmentTableOffset.toLong(), header.segmentTableNum * 12L, "segment table")
+            requireProviderRange(provider, header.relocationPatchesOffset.toLong(), header.relocationPatchesNum * 12L, "relocation patch table")
 
             seek(header.segmentTableOffset)
             val segments = readList<CRO0Header.SegmentTableEntry>(header.segmentTableNum)

@@ -11,15 +11,24 @@ for decrypted local 3DS executables/modules only.
    .\tests\build-extension.ps1
    ```
 
-2. Install the built extension into a Ghidra test environment.
-3. Import a decrypted CXI, CIA, CRO, or CRS.
-4. Run a payload-free structure export:
+2. Run the generated-fixture smoke tests:
+
+   ```powershell
+   .\tests\test-generated-fixtures.ps1
+   ```
+
+3. Install the built extension into a Ghidra test environment.
+4. Import a decrypted CXI, CIA, CRO, or CRS.
+5. For games with CRO/CRS modules, import the static CRS first, then import
+   related CRO modules and run the CRO linking script against the open project
+   programs.
+6. Run a payload-free structure export:
 
    ```powershell
    .\tests\export-structure.ps1 -InputPath "C:\path\to\local\decrypted.cxi"
    ```
 
-5. Compare memory blocks, functions, symbols, and external libraries against
+7. Compare memory blocks, functions, symbols, and external libraries against
    previous local runs:
 
    ```powershell
@@ -38,6 +47,8 @@ for decrypted local 3DS executables/modules only.
 - Outputs under `.local-test/` contain only structure, not game payload.
 - Standalone `.crs` imports do not crash, even when richer CXI/CIA context is
   unavailable.
+- Generated `.cro` and `.crs` fixtures import through headless Ghidra before
+  trying private game files.
 
 ## Payload Rules
 
