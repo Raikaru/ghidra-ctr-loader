@@ -30,8 +30,9 @@ for decrypted local 3DS executables/modules only.
    ```
 
    The extractor decompresses `.code` when the NCCH ExHeader marks it
-   compressed and writes a payload-free code-set manifest. Prefer the
-   code-set-aware export for `.code` validation:
+   compressed and writes a payload-free code-set manifest with stack size,
+   dependency module IDs, and `.text`/`.rodata`/`.data`/`.bss` layout. Prefer
+   the code-set-aware export for `.code` validation:
 
    ```powershell
    .\tests\export-code-set-structure.ps1 `
@@ -45,6 +46,10 @@ for decrypted local 3DS executables/modules only.
    ergonomics. `-DisableSwitchAnalysis` turns off Ghidra's decompiler switch
    analyzer, which can produce large warning logs from speculative jump-table
    reads on these 3DS binaries.
+
+   The code-set workflow also seeds confirmed anchors before analysis:
+   `ctr_entry`, `ctr_text_start`, `ctr_rodata_start`, `ctr_data_start`, and
+   `ctr_bss_start`.
 
    For a quick raw baseline, import `.code` as ARM:
 
