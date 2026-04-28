@@ -22,13 +22,40 @@ for decrypted local 3DS executables/modules only.
 5. For games with CRO/CRS modules, import the static CRS first, then import
    related CRO modules and run the CRO linking script against the open project
    programs.
-6. Run a payload-free structure export:
+6. For NCCH/CXI images that Ghidra exposes as a filesystem rather than a
+   direct program, extract private ExeFS members locally:
+
+   ```powershell
+   .\tests\extract-cxi-exefs.ps1 -InputPath "C:\path\to\local\decrypted.cxi"
+   ```
+
+   The extractor decompresses `.code` when the NCCH ExHeader marks it
+   compressed. Then import `.code` as raw ARM if needed:
+
+   ```powershell
+   .\tests\export-structure.ps1 `
+     -InputPath ".local-test\exefs\game\.code" `
+     -Processor "ARM:LE:32:v7" `
+     -Compiler default
+   ```
+
+7. Run a payload-free structure export:
 
    ```powershell
    .\tests\export-structure.ps1 -InputPath "C:\path\to\local\decrypted.cxi"
    ```
 
-7. Compare memory blocks, functions, symbols, and external libraries against
+   If a decrypted NCCH/CXI image is named with a generic extension such as
+   `.3ds`, preserve the original file and override only the temporary import
+   name:
+
+   ```powershell
+   .\tests\export-structure.ps1 `
+     -InputPath "C:\path\to\local\decrypted.3ds" `
+     -ImportExtension .cxi
+   ```
+
+8. Compare memory blocks, functions, symbols, and external libraries against
    previous local runs:
 
    ```powershell
