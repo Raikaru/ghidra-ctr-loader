@@ -171,7 +171,6 @@ class CXIFileSystem(private val fsFSRL: FSRLRoot, private var provider: ByteProv
     override fun getListing(directory: GFile?) = fsih.getListing(directory)
 
     override fun getFileAttributes(file: GFile, monitor: TaskMonitor): FileAttributes {
-        val metadata = fsih.getMetadata(file)
         val result = FileAttributes()
 
         return result

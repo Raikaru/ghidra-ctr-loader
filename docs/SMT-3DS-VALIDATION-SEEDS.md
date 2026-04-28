@@ -25,4 +25,5 @@ First generic improvement targets:
 - relocation validation;
 - multiple data/rodata section handling;
 - payload-safe CXI/CIA/CRO/CRS structure exports;
+- generated CRO/CRS smoke tests before private fixture runs;
 - SDK/library signature workflow notes.
