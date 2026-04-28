@@ -10,6 +10,7 @@ Record payload-free observations only:
 - language/compiler IDs;
 - memory block names, permissions, and counts;
 - function/symbol/external-library counts;
+- structure-export diffs from `tests/compare-structure.ps1`;
 - CRO/CRS import/export/linking behavior;
 - analyzer exception kinds from local headless logs;
 - generic loader improvement needed.

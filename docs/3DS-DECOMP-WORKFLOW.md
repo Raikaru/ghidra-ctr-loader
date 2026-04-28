@@ -20,7 +20,13 @@ for decrypted local 3DS executables/modules only.
    ```
 
 5. Compare memory blocks, functions, symbols, and external libraries against
-   previous local runs.
+   previous local runs:
+
+   ```powershell
+   .\tests\compare-structure.ps1 `
+     -Baseline ".local-test\structure-export\old.structure.json" `
+     -Current ".local-test\structure-export\new.structure.json"
+   ```
 
 ## What To Check
 
@@ -30,6 +36,8 @@ for decrypted local 3DS executables/modules only.
 - CRO/CRS imports expose useful external libraries and export labels.
 - Relocation handling is either correct or clearly reported as missing.
 - Outputs under `.local-test/` contain only structure, not game payload.
+- Standalone `.crs` imports do not crash, even when richer CXI/CIA context is
+  unavailable.
 
 ## Payload Rules
 

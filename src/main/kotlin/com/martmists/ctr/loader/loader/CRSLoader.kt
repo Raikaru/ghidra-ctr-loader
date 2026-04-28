@@ -21,7 +21,8 @@ class CRSLoader : CROLoader() {
     }
 
     override fun createSegmentsFromFile(provider: ByteProvider, program: Program, monitor: TaskMonitor, log: MessageLog) {
-        TODO()
+        log.appendMsg("Standalone CRS import has no parent CXI/CIA .code provider; falling back to CRO-style segments")
+        super.createSegmentsFromFile(provider, program, monitor, log)
     }
 
     override fun createSegmentsFromCXI(provider: ByteProvider, program: Program, monitor: TaskMonitor, log: MessageLog) {
@@ -85,7 +86,7 @@ class CRSLoader : CROLoader() {
                             if (offset == 0) {
                                 offset = 0x00800000
                             }
-                            MemoryBlockUtils.createInitializedBlock(program, false, segmentName, program.imageBase.add(offset.toLong()), segmentSize.toLong(), "", null, r, w, x, log)
+                            MemoryBlockUtils.createUninitializedBlock(program, false, segmentName, program.imageBase.add(offset.toLong()), segmentSize.toLong(), "", null, r, w, x, log)
                         }
                         else -> throw IllegalStateException("Unknown segment ID ${segment.id}")
                     }
