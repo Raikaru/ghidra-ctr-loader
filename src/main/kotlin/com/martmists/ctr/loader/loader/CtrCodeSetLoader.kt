@@ -214,6 +214,7 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
     private fun writeExHeaderMetadata(program: Program, ncchEx: NCCHExHeader, log: MessageLog) {
         val info = program.getOptions(Program.PROGRAM_INFO)
         val dependencies = dependencyModuleIds(ncchEx)
+        val serviceAccess = serviceAccessNames(ncchEx)
         val namedDependencies = dependencies.map { id ->
             val name = CtrSdkMetadata.dependencyName(id)
             if (name == null) hex(id) else "${hex(id)}:$name"
@@ -226,11 +227,14 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
         info.setString("3DS BSS Size", hex(Integer.toUnsignedLong(ncchEx.sci.bssSize)))
         info.setLong("3DS Dependency Count", dependencies.size.toLong())
         info.setString("3DS Dependency Module IDs", namedDependencies.joinToString(","))
-        log.appendMsg("Wrote 3DS ExHeader metadata (${dependencies.size} dependency module IDs)")
+        info.setLong("3DS Service Access Count", serviceAccess.size.toLong())
+        info.setString("3DS Service Access", serviceAccess.joinToString(","))
+        log.appendMsg("Wrote 3DS ExHeader metadata (${dependencies.size} dependency module IDs, ${serviceAccess.size} service ACL entries)")
     }
 
     private fun applySdkMetadata(program: Program, ncchEx: NCCHExHeader, log: MessageLog) {
         val dependencies = dependencyModuleIds(ncchEx)
+        val serviceAccess = serviceAccessNames(ncchEx)
         var namedDependencies = 0
         for (id in dependencies) {
             val name = CtrSdkMetadata.dependencyName(id) ?: continue
@@ -241,8 +245,10 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
         val svcComments = annotateSvcCalls(program)
         val info = program.getOptions(Program.PROGRAM_INFO)
         info.setLong("3DS Named Dependency Count", namedDependencies.toLong())
+        info.setLong("3DS Service Access Count", serviceAccess.size.toLong())
+        info.setString("3DS Service Access", serviceAccess.joinToString(","))
         info.setLong("3DS SVC Comments", svcComments.toLong())
-        log.appendMsg("Applied 3DS SDK metadata ($namedDependencies dependency names, $svcComments SVC comments)")
+        log.appendMsg("Applied 3DS SDK metadata ($namedDependencies dependency names, ${serviceAccess.size} service ACL entries, $svcComments SVC comments)")
     }
 
     private fun annotateSvcCalls(program: Program): Int {
@@ -283,6 +289,21 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
                 }
             }
         }
+    }
+
+    private fun serviceAccessNames(ncchEx: NCCHExHeader): List<String> {
+        return buildList {
+            addAll(serviceNamesFromBytes(ncchEx.aci.arm11LocalCaps.serviceAccessControl_256))
+            addAll(serviceNamesFromBytes(ncchEx.aci.arm11LocalCaps.extendedServiceAccessControl_16))
+        }.distinct().sorted()
+    }
+
+    private fun serviceNamesFromBytes(bytes: ByteArray): List<String> {
+        return bytes.asSequence()
+            .chunked(8)
+            .map { chunk -> chunk.takeWhile { it != 0.toByte() }.toByteArray().toString(Charsets.US_ASCII).trim() }
+            .filter { it.isNotBlank() && it.all { ch -> ch.code in 0x20..0x7e } }
+            .toList()
     }
 
     private fun sectionSummary(info: NCCHExHeader.SystemControlInfo.CodeSetInfo): String {

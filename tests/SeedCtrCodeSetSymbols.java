@@ -83,8 +83,9 @@ public class SeedCtrCodeSetSymbols extends GhidraScript {
         label(addr(bss.get("address_value").getAsLong()), "ctr_bss_start");
 
         int namedDependencies = seedDependencyLibraries(manifest);
+        int serviceAccess = writeServiceAccessMetadata(manifest);
         int svcComments = annotateSvcCalls();
-        println("Seeded 3DS SDK metadata: " + namedDependencies + " dependency names, " + svcComments + " SVC comments");
+        println("Seeded 3DS SDK metadata: " + namedDependencies + " dependency names, " + serviceAccess + " service ACL entries, " + svcComments + " SVC comments");
     }
 
     private void label(Address address, String name) throws Exception {
@@ -122,6 +123,33 @@ public class SeedCtrCodeSetSymbols extends GhidraScript {
             currentProgram.getExternalManager().addExternalLibraryName("3ds_" + name, SourceType.ANALYSIS);
             count++;
         }
+        return count;
+    }
+
+    private int writeServiceAccessMetadata(JsonObject manifest) {
+        if (!manifest.has("service_access") || !manifest.get("service_access").isJsonArray()) {
+            return 0;
+        }
+
+        StringBuilder names = new StringBuilder();
+        int count = 0;
+        for (JsonElement element : manifest.getAsJsonArray("service_access")) {
+            JsonObject service = element.getAsJsonObject();
+            String name = service.get("name").getAsString();
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            if (names.length() > 0) {
+                names.append(",");
+            }
+            names.append(name);
+            count++;
+        }
+
+        currentProgram.getOptions(ghidra.program.model.listing.Program.PROGRAM_INFO)
+            .setLong("3DS Service Access Count", count);
+        currentProgram.getOptions(ghidra.program.model.listing.Program.PROGRAM_INFO)
+            .setString("3DS Service Access", names.toString());
         return count;
     }
 

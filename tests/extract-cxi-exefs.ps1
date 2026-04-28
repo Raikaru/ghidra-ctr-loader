@@ -136,6 +136,33 @@ function Read-DependencyList([IO.BinaryReader] $Reader, [int64] $Offset) {
     return ,$dependencies
 }
 
+function Read-ServiceAccessList([IO.BinaryReader] $Reader, [int64] $Offset, [int] $Count) {
+    $Reader.BaseStream.Position = $Offset
+    $services = @()
+    for ($i = 0; $i -lt $Count; $i++) {
+        $raw = $Reader.ReadBytes(8)
+        $name = [Text.Encoding]::ASCII.GetString($raw).Trim([char] 0).Trim()
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+        $printable = $true
+        foreach ($char in $name.ToCharArray()) {
+            $value = [int] [char] $char
+            if ($value -lt 0x20 -or $value -gt 0x7e) {
+                $printable = $false
+                break
+            }
+        }
+        if ($printable) {
+            $services += [pscustomobject]@{
+                index = $i
+                name = $name
+            }
+        }
+    }
+    return ,$services
+}
+
 $fs = [IO.File]::OpenRead($InputPath)
 $br = [IO.BinaryReader]::new($fs)
 try {
@@ -157,6 +184,9 @@ try {
     $fs.Position = 0x23c
     $bssSize = $br.ReadUInt32()
     $dependencies = Read-DependencyList $br 0x240
+    $serviceAccess = @()
+    $serviceAccess += Read-ServiceAccessList $br 0x450 32
+    $serviceAccess += Read-ServiceAccessList $br 0x550 2
 
     $fs.Position = 0x1a0
     $exefsOffsetMedia = $br.ReadUInt32()
@@ -204,6 +234,8 @@ try {
         stack_size = $stackSize
         dependency_count = $dependencies.Count
         dependencies = @($dependencies)
+        service_access_count = $serviceAccess.Count
+        service_access = @($serviceAccess)
         code_set = [pscustomobject]@{
             text = $textCodeSet
             rodata = $rodataCodeSet

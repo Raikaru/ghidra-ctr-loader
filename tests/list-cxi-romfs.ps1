@@ -90,6 +90,17 @@ function Read-FileEntry([IO.BinaryReader] $Reader, [int64] $Base, [int64] $Offse
     }
 }
 
+function Join-RomFsPath([string] $ParentPath, [string] $Name) {
+    if ([string]::IsNullOrWhiteSpace($Name)) {
+        if ([string]::IsNullOrWhiteSpace($ParentPath)) { return "/" }
+        return $ParentPath
+    }
+    if ([string]::IsNullOrWhiteSpace($ParentPath) -or $ParentPath -eq "/") {
+        return "/$Name"
+    }
+    return "$ParentPath/$Name"
+}
+
 $fs = [IO.File]::OpenRead($InputPath)
 $br = [IO.BinaryReader]::new($fs)
 try {
@@ -128,7 +139,7 @@ try {
 
     function Walk-Directory([int] $Offset, [string] $ParentPath) {
         $dir = Read-Directory $br $dirMetaBase $Offset
-        $dirPath = if ([string]::IsNullOrWhiteSpace($dir.name)) { $ParentPath } else { "$ParentPath/$($dir.name)" }
+        $dirPath = Join-RomFsPath $ParentPath $dir.name
         if ([string]::IsNullOrWhiteSpace($dirPath)) {
             $dirPath = "/"
         }
@@ -144,7 +155,7 @@ try {
         $childFileOffset = $dir.child_file
         while ($childFileOffset -ne -1) {
             $file = Read-FileEntry $br $fileMetaBase $childFileOffset
-            $filePath = if ($dirPath -eq "/") { "/$($file.name)" } else { "$dirPath/$($file.name)" }
+            $filePath = Join-RomFsPath $dirPath $file.name
             $files.Add([pscustomobject]@{
                 path = $filePath
                 size = $file.size

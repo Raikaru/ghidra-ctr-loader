@@ -92,6 +92,17 @@ for decrypted local 3DS executables/modules only.
      -ProjectName "game-code-set"
    ```
 
+   For the full starter pass from a decrypted CXI/CCI/.3ds, use the all-in-one
+   project helper. It extracts NCSD partition 0 when needed, extracts ExeFS,
+   lists RomFS metadata, discovers CRO/CRS candidates, creates a mapped Ghidra
+   code-set project, and writes a payload-safe project manifest:
+
+   ```powershell
+   .\tests\create-3ds-decomp-project.ps1 `
+     -InputPath "C:\path\to\local\decrypted.3ds" `
+     -ProjectName "game-code-set"
+   ```
+
 8. Summarize analysis warnings from any headless run:
 
    ```powershell
@@ -111,6 +122,28 @@ for decrypted local 3DS executables/modules only.
    .\tests\find-ctr-modules.ps1 `
      -ExeFsManifest ".local-test\exefs\game\manifest.structure.json" `
      -RomFsManifest ".local-test\romfs-list\game.romfs.structure.json"
+   ```
+
+   If candidates are present, validate a small payload-safe structure sample:
+
+   ```powershell
+   .\tests\validate-ctr-modules.ps1 `
+     -InputPath "C:\path\to\local\decrypted.cxi" `
+     -ModuleManifest ".local-test\module-discovery\ctr-modules.structure.json" `
+     -ExtractedExeFsDir ".local-test\exefs\game"
+   ```
+
+   `validate-ctr-modules.ps1` extracts only the selected private modules into
+   ignored `.local-test` space and records structure summaries. If no modules
+   are found, it writes a `no_modules_found` validation summary instead of
+   failing.
+
+   To extract a known RomFS module path manually:
+
+   ```powershell
+   .\tests\extract-cxi-romfs-file.ps1 `
+     -InputPath "C:\path\to\local\decrypted.cxi" `
+     -RomFsPath "/path/to/module.cro"
    ```
 
 11. Run a payload-free structure export:
@@ -146,7 +179,9 @@ for decrypted local 3DS executables/modules only.
 - CRO/CRS imports expose useful external libraries and export labels.
 - Relocation handling is either correct or clearly summarized in Program Info
   and the import log.
-- Outputs under `.local-test/` contain only structure, not game payload.
+- Committed outputs contain only structure, not game payload. Ignored
+  `.local-test/` scratch space may contain extracted private files from ExeFS,
+  RomFS, or module validation runs.
 - Standalone `.crs` imports do not crash, even when richer CXI/CIA context is
   unavailable.
 - Generated `.cro` and `.crs` fixtures import through headless Ghidra before
