@@ -121,6 +121,21 @@ function Read-CodeSetInfo([IO.BinaryReader] $Reader, [int64] $Offset) {
     }
 }
 
+function Read-DependencyList([IO.BinaryReader] $Reader, [int64] $Offset) {
+    $Reader.BaseStream.Position = $Offset
+    $dependencies = @()
+    for ($i = 0; $i -lt 48; $i++) {
+        $moduleId = $Reader.ReadUInt64()
+        if ($moduleId -ne 0) {
+            $dependencies += [pscustomobject]@{
+                index = $i
+                module_id = ("0x{0:x16}" -f $moduleId)
+            }
+        }
+    }
+    return ,$dependencies
+}
+
 $fs = [IO.File]::OpenRead($InputPath)
 $br = [IO.BinaryReader]::new($fs)
 try {
@@ -135,10 +150,13 @@ try {
     $codeCompressed = (($exheaderFlags -band 0x1) -ne 0)
 
     $textCodeSet = Read-CodeSetInfo $br 0x210
+    $fs.Position = 0x21c
+    $stackSize = $br.ReadUInt32()
     $rodataCodeSet = Read-CodeSetInfo $br 0x220
     $dataCodeSet = Read-CodeSetInfo $br 0x230
     $fs.Position = 0x23c
     $bssSize = $br.ReadUInt32()
+    $dependencies = Read-DependencyList $br 0x240
 
     $fs.Position = 0x1a0
     $exefsOffsetMedia = $br.ReadUInt32()
@@ -183,6 +201,9 @@ try {
         exefs_offset = ("0x{0:x}" -f $exefsOffset)
         exefs_size = ("0x{0:x}" -f $exefsSize)
         code_compressed = $codeCompressed
+        stack_size = $stackSize
+        dependency_count = $dependencies.Count
+        dependencies = @($dependencies)
         code_set = [pscustomobject]@{
             text = $textCodeSet
             rodata = $rodataCodeSet
