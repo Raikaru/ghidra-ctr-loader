@@ -70,7 +70,7 @@ class CIAFileSystem(fsFSRL: FSRLRoot, provider: ByteProvider, fsService: FileSys
         override fun markSupported() = true
 
         override fun mark(readlimit: Int) {
-            mark = currentPos + readlimit
+            mark = currentPos
         }
 
         override fun reset() {
@@ -79,12 +79,24 @@ class CIAFileSystem(fsFSRL: FSRLRoot, provider: ByteProvider, fsService: FileSys
             currentPos = mark
         }
 
-        override fun read() = stream.read().also { currentPos++ }
-        override fun read(b: ByteArray) = read(b, 0, b.size).also { currentPos += it }
-        override fun read(b: ByteArray, off: Int, len: Int) = stream.read(b, off, len).also { currentPos += it }
+        override fun read() = stream.read().also {
+            if (it != -1) {
+                currentPos++
+            }
+        }
+        override fun read(b: ByteArray) = read(b, 0, b.size)
+        override fun read(b: ByteArray, off: Int, len: Int) = stream.read(b, off, len).also {
+            if (it > 0) {
+                currentPos += it
+            }
+        }
         override fun readNBytes(len: Int) = stream.readNBytes(len).also { currentPos += it.size }
-        override fun readNBytes(b: ByteArray?, off: Int, len: Int) = stream.readNBytes(b, off, len).also { currentPos += it }
-        override fun skip(n: Long) = stream.skip(n).also { currentPos += n }
+        override fun readNBytes(b: ByteArray?, off: Int, len: Int) = stream.readNBytes(b, off, len).also {
+            if (it > 0) {
+                currentPos += it
+            }
+        }
+        override fun skip(n: Long) = stream.skip(n).also { currentPos += it }
         override fun skipNBytes(n: Long) = stream.skipNBytes(n).also { currentPos += n }
         override fun readAllBytes() = stream.readAllBytes().also { currentPos += it.size }
         override fun available() = stream.available()

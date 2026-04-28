@@ -152,7 +152,7 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
                         if (offset == 0) {
                             offset = 0x00800000
                         }
-                        MemoryBlockUtils.createInitializedBlock(program, false, segmentName, program.imageBase.add(offset.toLong()), segmentSize.toLong(), "", null, r, w, x, log)
+                        MemoryBlockUtils.createUninitializedBlock(program, false, segmentName, program.imageBase.add(offset.toLong()), segmentSize.toLong(), "", null, r, w, x, log)
                     }
                     else -> throw IllegalStateException("Unknown segment ID ${segment.id}")
                 }
