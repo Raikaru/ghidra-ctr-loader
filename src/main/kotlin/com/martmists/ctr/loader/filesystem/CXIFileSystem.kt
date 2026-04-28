@@ -48,13 +48,23 @@ class CXIFileSystem(private val fsFSRL: FSRLRoot, private var provider: ByteProv
                     continue
                 }
 
+                val fileName = file.filename_8.stripNulls()
                 fsih.storeFile(
-                    "/exefs/${file.filename_8.stripNulls()}",
+                    "/exefs/$fileName",
                     fileCount++,
                     false,
                     file.size.toLong(),
                     Metadata(ncch, ncchEx, null),
                 )
+                if (fileName == ".code") {
+                    fsih.storeFile(
+                        "/exefs/code.bin",
+                        fileCount++,
+                        false,
+                        file.size.toLong(),
+                        Metadata(ncch, ncchEx, null),
+                    )
+                }
             }
 
             seek(ncch.romfsOffset.mediaUnits + 0x1000)
@@ -114,7 +124,10 @@ class CXIFileSystem(private val fsFSRL: FSRLRoot, private var provider: ByteProv
         val metadata = fsih.getMetadata(file)
 
         if (file.path.startsWith("/exefs/")) {
-            val fileName = file.path.removePrefix("/exefs/")
+            val fileName = when (val pathName = file.path.removePrefix("/exefs/")) {
+                "code.bin" -> ".code"
+                else -> pathName
+            }
             return provider.getInputStream(0).reader {
                 seek(metadata.ncch.exefsOffset.mediaUnits)
                 val exefsHeader = read<ExeFSHeader>()

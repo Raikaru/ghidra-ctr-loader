@@ -9,6 +9,7 @@ Currently supports:
 - CXI Imports
 - CIA Imports (decrypted only)
   - Currently only imports the first container
+- CXI ExeFS `.code` imports with NCCH ExHeader code-set mapping
 - CRO Imports
 - CRS Imports (from CXI/CIA only)
 - CRO multi-file analysis (i.e. linking imports and exports together)
