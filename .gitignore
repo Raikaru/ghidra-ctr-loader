@@ -47,3 +47,9 @@ gradle-local.properties
 lib/
 *.cxi
 *.cia
+*.cci
+*.3ds
+*.3dsx
+*.cro
+*.crs
+.local-test/
