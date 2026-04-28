@@ -29,6 +29,9 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Resolve Ghidra release URL
         id: resolve
         run: |
@@ -66,8 +69,7 @@ jobs:
       - name: Build extension
         run: |
           set -euo pipefail
-          chmod +x ./gradlew
-          GHIDRA_INSTALL_DIR="$PWD/ghidra" ./gradlew --no-daemon buildExtension
+          GHIDRA_INSTALL_DIR="$PWD/ghidra" gradle --no-daemon buildExtension
 
       - name: Prepare artifact metadata
         id: artifact
