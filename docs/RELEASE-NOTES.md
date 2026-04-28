@@ -1,5 +1,19 @@
 # Release Notes
 
+## v1.3.0
+
+- Adds an all-in-one local 3DS decomp starter script for decrypted CXI/CCI/.3ds
+  inputs: partition extraction, ExeFS extraction, RomFS listing, CRO/CRS
+  discovery, and persistent Ghidra code-set project creation.
+- Adds targeted RomFS file extraction and CRO/CRS validation helpers for
+  payload-safe module checks.
+- Records 3DS service access control entries in code-set Program Info and local
+  ExeFS manifests.
+- Adds CRO linking quality counters for named, indexed, anonymous, created, and
+  unresolved links.
+- Adds SMT-focused 3DS workflow notes for Strange Journey Redux, SMT IV, and
+  SMT IV Apocalypse local project setup.
+
 ## v1.2.0
 
 - Adds lightweight 3DS SDK metadata: dependency module names become external

@@ -1,21 +1,26 @@
 # SPDX-License-Identifier: MIT
 #
-# Emit a payload-safe RomFS file listing for a private decrypted NCCH/CXI image.
-# The output records paths and sizes only, never file data.
+# Extract one RomFS member from a private decrypted NCCH/CXI image into ignored
+# local test space. Do not commit the output.
 #
 # Usage:
-#   pwsh tests/list-cxi-romfs.ps1 -InputPath "C:\path\to\decrypted.cxi"
+#   pwsh tests/extract-cxi-romfs-file.ps1 `
+#     -InputPath "C:\path\to\decrypted.cxi" `
+#     -RomFsPath "/module/game.cro"
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)]
     [string] $InputPath,
 
-    [Parameter(Mandatory=$false)]
-    [string] $OutPath = "",
+    [Parameter(Mandatory=$true)]
+    [string] $RomFsPath,
 
     [Parameter(Mandatory=$false)]
-    [string] $OutDir = ""
+    [string] $OutDir = "",
+
+    [Parameter(Mandatory=$false)]
+    [string] $OutPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,17 +29,18 @@ Set-StrictMode -Version Latest
 if (-not (Test-Path $InputPath)) {
     throw "Input path not found: $InputPath"
 }
+if (-not $RomFsPath.StartsWith("/")) {
+    throw "RomFS path must start with '/': $RomFsPath"
+}
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutDir)) {
-    $OutDir = Join-Path $RepoRoot ".local-test\romfs-list"
+    $stem = [IO.Path]::GetFileNameWithoutExtension($InputPath) -replace '[^A-Za-z0-9_.-]', '_'
+    $OutDir = Join-Path $RepoRoot ".local-test\romfs-extract\$stem"
+} elseif (-not [IO.Path]::IsPathRooted($OutDir)) {
+    $OutDir = Join-Path $RepoRoot $OutDir
 }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-
-if ([string]::IsNullOrWhiteSpace($OutPath)) {
-    $stem = [IO.Path]::GetFileNameWithoutExtension($InputPath) -replace '[^A-Za-z0-9_.-]', '_'
-    $OutPath = Join-Path $OutDir "$stem.romfs.structure.json"
-}
 
 function Read-Utf16Name([IO.BinaryReader] $Reader, [int] $ByteLength) {
     if ($ByteLength -le 0) {
@@ -101,6 +107,15 @@ function Join-RomFsPath([string] $ParentPath, [string] $Name) {
     return "$ParentPath/$Name"
 }
 
+$targetParts = ($RomFsPath -replace '\\', '/') -split '/' | Where-Object { $_ -ne "" }
+$normalizedTarget = "/" + ($targetParts -join "/")
+$safeName = ($normalizedTarget.TrimStart("/") -replace '[\\/]+', "__") -replace '[^A-Za-z0-9_.-]', '_'
+if ([string]::IsNullOrWhiteSpace($OutPath)) {
+    $OutPath = Join-Path $OutDir $safeName
+} elseif (-not [IO.Path]::IsPathRooted($OutPath)) {
+    $OutPath = Join-Path $RepoRoot $OutPath
+}
+
 $fs = [IO.File]::OpenRead($InputPath)
 $br = [IO.BinaryReader]::new($fs)
 try {
@@ -121,21 +136,20 @@ try {
 
     $level3Start = $romfsOffset + 0x1000L
     $fs.Position = $level3Start
-    $level3Length = $br.ReadInt32()
-    $dirHashOffset = $br.ReadInt32()
-    $dirHashSize = $br.ReadInt32()
+    $null = $br.ReadInt32()
+    $null = $br.ReadInt32()
+    $null = $br.ReadInt32()
     $dirMetaOffset = $br.ReadInt32()
-    $dirMetaSize = $br.ReadInt32()
-    $fileHashOffset = $br.ReadInt32()
-    $fileHashSize = $br.ReadInt32()
+    $null = $br.ReadInt32()
+    $null = $br.ReadInt32()
+    $null = $br.ReadInt32()
     $fileMetaOffset = $br.ReadInt32()
-    $fileMetaSize = $br.ReadInt32()
+    $null = $br.ReadInt32()
     $fileDataOffset = $br.ReadInt32()
 
     $dirMetaBase = $level3Start + $dirMetaOffset
     $fileMetaBase = $level3Start + $fileMetaOffset
-    $files = New-Object System.Collections.Generic.List[object]
-    $directories = New-Object System.Collections.Generic.List[string]
+    $script:found = $null
 
     function Walk-Directory([int] $Offset, [string] $ParentPath) {
         $dir = Read-Directory $br $dirMetaBase $Offset
@@ -143,53 +157,59 @@ try {
         if ([string]::IsNullOrWhiteSpace($dirPath)) {
             $dirPath = "/"
         }
-        $directories.Add($dirPath) | Out-Null
-
-        $childDirOffset = $dir.child_dir
-        while ($childDirOffset -ne -1) {
-            Walk-Directory $childDirOffset $dirPath
-            $child = Read-Directory $br $dirMetaBase $childDirOffset
-            $childDirOffset = $child.sibling
-        }
 
         $childFileOffset = $dir.child_file
         while ($childFileOffset -ne -1) {
             $file = Read-FileEntry $br $fileMetaBase $childFileOffset
             $filePath = Join-RomFsPath $dirPath $file.name
-            $files.Add([pscustomobject]@{
-                path = $filePath
-                size = $file.size
-            }) | Out-Null
+            if ($filePath -eq $normalizedTarget) {
+                $script:found = [pscustomobject]@{
+                    path = $filePath
+                    data_offset = $file.data_offset
+                    size = $file.size
+                }
+                return
+            }
             $childFileOffset = $file.sibling
+        }
+
+        $childDirOffset = $dir.child_dir
+        while ($childDirOffset -ne -1 -and $null -eq $script:found) {
+            Walk-Directory $childDirOffset $dirPath
+            $child = Read-Directory $br $dirMetaBase $childDirOffset
+            $childDirOffset = $child.sibling
         }
     }
 
     Walk-Directory 0 ""
-
-    $extensions = @($files | ForEach-Object {
-        $ext = [IO.Path]::GetExtension($_.path)
-        if ([string]::IsNullOrWhiteSpace($ext)) { "<none>" } else { $ext.ToLowerInvariant() }
-    } | Group-Object | Sort-Object Count -Descending | ForEach-Object {
-        [pscustomobject]@{
-            extension = $_.Name
-            count = $_.Count
-        }
-    })
-
-    $summary = [pscustomobject]@{
-        source_name = [IO.Path]::GetFileName($InputPath)
-        romfs_offset = ("0x{0:x}" -f $romfsOffset)
-        romfs_size = ("0x{0:x}" -f $romfsSize)
-        level3_length = $level3Length
-        directory_count = $directories.Count
-        file_count = $files.Count
-        total_file_bytes = @($files | Measure-Object -Property size -Sum)[0].Sum
-        extensions = $extensions
-        directories = @($directories | Sort-Object)
-        files = @($files | Sort-Object path)
+    if ($null -eq $script:found) {
+        throw "RomFS file not found: $normalizedTarget"
     }
 
-    $summary | ConvertTo-Json -Depth 8 | Out-File -FilePath $OutPath -Encoding utf8
+    $parent = Split-Path -Parent $OutPath
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+
+    $sourceOffset = $level3Start + $fileDataOffset + [int64] $script:found.data_offset
+    $fs.Position = $sourceOffset
+    $out = [IO.File]::Create($OutPath)
+    try {
+        $remaining = [int64] $script:found.size
+        $buffer = New-Object byte[] 1048576
+        while ($remaining -gt 0) {
+            $wanted = [int] [Math]::Min($buffer.Length, $remaining)
+            $read = $fs.Read($buffer, 0, $wanted)
+            if ($read -le 0) {
+                throw "Unexpected EOF while extracting $normalizedTarget"
+            }
+            $out.Write($buffer, 0, $read)
+            $remaining -= $read
+        }
+    } finally {
+        $out.Dispose()
+    }
+
     Write-Host "Wrote $OutPath"
 } finally {
     $br.Dispose()

@@ -53,6 +53,21 @@ $extension = [IO.Path]::GetExtension($InputPath)
 if ([string]::IsNullOrWhiteSpace($extension)) {
     $extension = ".cxi"
 }
+$magicFs = [IO.File]::OpenRead($InputPath)
+try {
+    $magicFs.Position = 0x100
+    $magicBytes = New-Object byte[] 4
+    if ($magicFs.Read($magicBytes, 0, 4) -eq 4) {
+        $magic = [Text.Encoding]::ASCII.GetString($magicBytes)
+        if ($magic -eq "NCCH") {
+            $extension = ".cxi"
+        } elseif ($magic -eq "NCSD") {
+            $extension = ".3ds"
+        }
+    }
+} finally {
+    $magicFs.Dispose()
+}
 
 if (Test-Path $localProjectDir) {
     Remove-Item -Recurse -Force $localProjectDir

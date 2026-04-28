@@ -24,6 +24,10 @@ open class CROLinkingScriptImpl : GhidraScript(), CROUtilities {
     override fun run() {
         val data = currentProgram.getModuleData()
         val namedImports = data.namedImports.entries.toMutableSet()
+        var linkedNamedImports = 0L
+        var linkedIndexedImports = 0L
+        var linkedAnonymousImports = 0L
+        var createdAnonymousExports = 0L
 
         // Scan all files for anonymous imports to here
         getAllCROFiles().map {
@@ -45,6 +49,7 @@ open class CROLinkingScriptImpl : GhidraScript(), CROUtilities {
                 val reference = currentProgram.createReferenceTo(moduleProgram, segment, offset, name, monitor)
                 currentProgram.applyPatches(import.listOffset, reference)
                 namedImports.remove(entry)
+                linkedNamedImports++
             }
 
             // Create data at anonymous imports
@@ -53,6 +58,7 @@ open class CROLinkingScriptImpl : GhidraScript(), CROUtilities {
                 module.anonymous.forEach { entry ->
                     val (segment, offset) = entry.segmentOffset.segOff
                     currentProgram.createFromReference(segment, offset, "${data.name}_export_anonymous_${segment}_${offset.hex}")
+                    createdAnonymousExports++
                 }
             }
 
@@ -64,6 +70,7 @@ open class CROLinkingScriptImpl : GhidraScript(), CROUtilities {
                     val (segment, offset) = export.segmentOffset.segOff
                     val reference = currentProgram.createReferenceTo(moduleProgram, segment, offset, "${moduleData.name}_export_indexed_${entry.indexOffset}", monitor)
                     currentProgram.applyPatches(entry.listOffset, reference)
+                    linkedIndexedImports++
                 }
 
                 // Find locations of anonymous imports
@@ -72,8 +79,21 @@ open class CROLinkingScriptImpl : GhidraScript(), CROUtilities {
                     val (segment, offset) = entry.segmentOffset.segOff
                     val reference = currentProgram.createReferenceTo(moduleProgram, segment, offset, "${moduleData.name}_export_anonymous_${segment}_${offset.hex}", monitor)
                     currentProgram.applyPatches(entry.listOffset, reference)
+                    linkedAnonymousImports++
                 }
             }
         }
+
+        val info = currentProgram.getOptions(Program.PROGRAM_INFO)
+        info.setLong("CRO Linked Named Imports", linkedNamedImports)
+        info.setLong("CRO Linked Indexed Imports", linkedIndexedImports)
+        info.setLong("CRO Linked Anonymous Imports", linkedAnonymousImports)
+        info.setLong("CRO Created Anonymous Exports", createdAnonymousExports)
+        info.setLong("CRO Unresolved Named Imports", namedImports.size.toLong())
+        println(
+            "CRO linking summary: named=$linkedNamedImports, indexed=$linkedIndexedImports, " +
+                "anonymous=$linkedAnonymousImports, createdAnonymousExports=$createdAnonymousExports, " +
+                "unresolvedNamed=${namedImports.size}"
+        )
     }
 }
