@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.martmists"
-version = "1.0.0"
+version = "1.1.0"
 
 val fp = File(projectDir, "gradle-local.properties")
 if (fp.exists()) {
