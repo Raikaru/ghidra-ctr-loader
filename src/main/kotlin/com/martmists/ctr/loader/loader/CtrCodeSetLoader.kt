@@ -2,6 +2,7 @@ package com.martmists.ctr.loader.loader
 
 import com.martmists.ctr.ext.reader
 import com.martmists.ctr.ext.stripNulls
+import com.martmists.ctr.common.CtrSdkMetadata
 import com.martmists.ctr.loader.filesystem.CIAFileSystem
 import com.martmists.ctr.loader.format.NCCHExHeader
 import ghidra.app.util.MemoryBlockUtils
@@ -19,6 +20,7 @@ import ghidra.program.model.address.AddressSet
 import ghidra.program.model.lang.LanguageCompilerSpecPair
 import ghidra.program.model.listing.CommentType
 import ghidra.program.model.listing.Program
+import ghidra.program.model.mem.MemoryBlock
 import ghidra.program.model.symbol.SourceType
 import ghidra.util.task.TaskMonitor
 import java.io.IOException
@@ -32,6 +34,7 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
         private const val OPTION_SEED_LABELS = "Seed code-set labels"
         private const val OPTION_DISABLE_SWITCH_ANALYSIS = "Disable Decompiler Switch Analysis"
         private const val OPTION_WRITE_EXHEADER_METADATA = "Write ExHeader metadata"
+        private const val OPTION_APPLY_SDK_METADATA = "Apply 3DS SDK metadata"
     }
 
     override fun getName() = "3DS Code Set Loader"
@@ -56,6 +59,7 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
         options.add(Option(OPTION_SEED_LABELS, true))
         options.add(Option(OPTION_DISABLE_SWITCH_ANALYSIS, true))
         options.add(Option(OPTION_WRITE_EXHEADER_METADATA, true))
+        options.add(Option(OPTION_APPLY_SDK_METADATA, true))
         return options
     }
 
@@ -75,6 +79,9 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
             }
             if (options.writeExHeaderMetadata) {
                 writeExHeaderMetadata(program, ncchEx, log)
+            }
+            if (options.applySdkMetadata) {
+                applySdkMetadata(program, ncchEx, log)
             }
         }
     }
@@ -207,6 +214,10 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
     private fun writeExHeaderMetadata(program: Program, ncchEx: NCCHExHeader, log: MessageLog) {
         val info = program.getOptions(Program.PROGRAM_INFO)
         val dependencies = dependencyModuleIds(ncchEx)
+        val namedDependencies = dependencies.map { id ->
+            val name = CtrSdkMetadata.dependencyName(id)
+            if (name == null) hex(id) else "${hex(id)}:$name"
+        }
         info.setString("3DS Application Title", ncchEx.sci.applicationTitle_8.stripNulls())
         info.setString("3DS Stack Size", hex(Integer.toUnsignedLong(ncchEx.sci.stackSize)))
         info.setString("3DS Text Code Set", sectionSummary(ncchEx.sci.textCodeSetInfo))
@@ -214,8 +225,52 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
         info.setString("3DS Data Code Set", sectionSummary(ncchEx.sci.dataCodeSetInfo))
         info.setString("3DS BSS Size", hex(Integer.toUnsignedLong(ncchEx.sci.bssSize)))
         info.setLong("3DS Dependency Count", dependencies.size.toLong())
-        info.setString("3DS Dependency Module IDs", dependencies.joinToString(",") { hex(it) })
+        info.setString("3DS Dependency Module IDs", namedDependencies.joinToString(","))
         log.appendMsg("Wrote 3DS ExHeader metadata (${dependencies.size} dependency module IDs)")
+    }
+
+    private fun applySdkMetadata(program: Program, ncchEx: NCCHExHeader, log: MessageLog) {
+        val dependencies = dependencyModuleIds(ncchEx)
+        var namedDependencies = 0
+        for (id in dependencies) {
+            val name = CtrSdkMetadata.dependencyName(id) ?: continue
+            program.externalManager.addExternalLibraryName("3ds_$name", SourceType.ANALYSIS)
+            namedDependencies++
+        }
+
+        val svcComments = annotateSvcCalls(program)
+        val info = program.getOptions(Program.PROGRAM_INFO)
+        info.setLong("3DS Named Dependency Count", namedDependencies.toLong())
+        info.setLong("3DS SVC Comments", svcComments.toLong())
+        log.appendMsg("Applied 3DS SDK metadata ($namedDependencies dependency names, $svcComments SVC comments)")
+    }
+
+    private fun annotateSvcCalls(program: Program): Int {
+        val text = program.memory.getBlock(".text") ?: return 0
+        var count = 0
+        eachAlignedWord(program, text) { address, word ->
+            if ((word and 0xff000000.toInt()) != 0xef000000.toInt()) {
+                return@eachAlignedWord
+            }
+            val svcNumber = word and 0x00ffffff
+            val svcName = CtrSdkMetadata.svcName(svcNumber) ?: return@eachAlignedWord
+            val comment = "3DS SVC 0x${svcNumber.toString(16)}: $svcName"
+            program.listing.setComment(address, CommentType.REPEATABLE, comment)
+            count++
+        }
+        return count
+    }
+
+    private fun eachAlignedWord(program: Program, block: MemoryBlock, visit: (Address, Int) -> Unit) {
+        val memory = program.memory
+        var address = block.start
+        while (address <= block.end.subtract(3)) {
+            val bytes = ByteArray(4)
+            memory.getBytes(address, bytes)
+            val word = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).int
+            visit(address, word)
+            address = address.add(4)
+        }
     }
 
     private fun dependencyModuleIds(ncchEx: NCCHExHeader): List<Long> {
@@ -289,6 +344,7 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
         val seedLabels: Boolean,
         val disableSwitchAnalysis: Boolean,
         val writeExHeaderMetadata: Boolean,
+        val applySdkMetadata: Boolean,
     ) {
         companion object {
             fun from(options: List<Option>): CodeSetLoaderOptions {
@@ -297,6 +353,7 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
                     seedLabels = booleanOption(options, OPTION_SEED_LABELS, true),
                     disableSwitchAnalysis = booleanOption(options, OPTION_DISABLE_SWITCH_ANALYSIS, true),
                     writeExHeaderMetadata = booleanOption(options, OPTION_WRITE_EXHEADER_METADATA, true),
+                    applySdkMetadata = booleanOption(options, OPTION_APPLY_SDK_METADATA, true),
                 )
             }
 

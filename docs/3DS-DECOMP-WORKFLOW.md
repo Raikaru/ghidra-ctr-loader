@@ -58,7 +58,9 @@ for decrypted local 3DS executables/modules only.
 
    The code-set workflow also seeds confirmed anchors before analysis:
    `ctr_entry`, `ctr_text_start`, `ctr_rodata_start`, `ctr_data_start`, and
-   `ctr_bss_start`.
+   `ctr_bss_start`. Direct CXI/CIA imports also add known 3DS dependency
+   module names as external libraries and add repeatable comments to known
+   ARM SVC instructions in `.text`.
 
    For a quick raw baseline, import `.code` as ARM:
 
@@ -79,6 +81,15 @@ for decrypted local 3DS executables/modules only.
      -ProjectName "game-code-set" `
      -InitializeBss `
      -DisableSwitchAnalysis
+   ```
+
+   To build the same kind of project directly from a decrypted CXI/CIA without
+   manually extracting `.code` first:
+
+   ```powershell
+   .\tests\create-container-code-set-project.ps1 `
+     -InputPath "C:\path\to\local\decrypted.cxi" `
+     -ProjectName "game-code-set"
    ```
 
 8. Summarize analysis warnings from any headless run:
@@ -133,12 +144,15 @@ for decrypted local 3DS executables/modules only.
 - ARM language selection is sane.
 - `.text`, `.rodata`, `.data`, and `.bss`-like regions are represented.
 - CRO/CRS imports expose useful external libraries and export labels.
-- Relocation handling is either correct or clearly reported as missing.
+- Relocation handling is either correct or clearly summarized in Program Info
+  and the import log.
 - Outputs under `.local-test/` contain only structure, not game payload.
 - Standalone `.crs` imports do not crash, even when richer CXI/CIA context is
   unavailable.
 - Generated `.cro` and `.crs` fixtures import through headless Ghidra before
   trying private game files.
+- Generated `.cxi` and `.cia` fixtures import `/exefs/code.bin` through the
+  code-set loader before trying private game files.
 
 ## Payload Rules
 
