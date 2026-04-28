@@ -31,6 +31,18 @@ Open the resulting Ghidra projects from:
 .local-test\decomp-projects\<project>\ghidra\projects\<project>
 ```
 
+Generate a payload-safe quality report and handoff note before giving the
+project to another agent:
+
+```powershell
+.\tests\new-3ds-project-quality-report.ps1 `
+  -ProjectManifest ".local-test\decomp-projects\smt-iv\project.structure.json"
+
+.\tests\new-3ds-decomp-handoff.ps1 `
+  -ProjectManifest ".local-test\decomp-projects\smt-iv\project.structure.json" `
+  -TargetName "SMT IV"
+```
+
 ## Current Local Module Result
 
 The current payload-safe manifests for Strange Journey Redux, SMT IV, and SMT IV
@@ -54,7 +66,8 @@ When a title does contain CRO/CRS modules, use:
 - Symbols: `ctr_entry`, `ctr_text_start`, `ctr_rodata_start`,
   `ctr_data_start`, and `ctr_bss_start`.
 - External libraries: known 3DS system-module dependencies such as `3ds_fs`,
-  `3ds_gsp`, `3ds_hid`, `3ds_ro`, or related names when present.
+  `3ds_gsp`, `3ds_hid`, `3ds_ro`, and service ACL libraries such as
+  `3ds_srv_fs_USER` or related names when present.
 - Headless logs: summarize warning patterns with
   `tests/summarize-headless-log.ps1`.
 - RomFS manifest extension counts: use them to prioritize asset/container

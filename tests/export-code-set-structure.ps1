@@ -66,6 +66,7 @@ try {
     docker exec $Container bash -lc "rm -rf $containerWork && mkdir -p $containerWork/scripts $containerWork/input $containerWork/proj" | Out-Null
     docker cp (Join-Path $RepoRoot "tests\MapCtrCodeSet.java") "${Container}:$containerWork/scripts/" | Out-Null
     docker cp (Join-Path $RepoRoot "tests\SeedCtrCodeSetSymbols.java") "${Container}:$containerWork/scripts/" | Out-Null
+    docker cp (Join-Path $RepoRoot "tests\ApplyCtrAnalyzerPreset.java") "${Container}:$containerWork/scripts/" | Out-Null
     docker cp (Join-Path $RepoRoot "tests\ExportCtrStructureJson.java") "${Container}:$containerWork/scripts/" | Out-Null
     docker cp $CodePath "${Container}:$containerWork/input/input.code" | Out-Null
     docker cp $ManifestPath "${Container}:$containerWork/input/manifest.structure.json" | Out-Null
@@ -78,7 +79,7 @@ try {
         $mapperArgs += " --disable-switch-analysis"
     }
 
-    $raw = docker exec $Container bash -lc "/opt/ghidra/support/analyzeHeadless $containerWork/proj export -import $containerWork/input/input.code -processor 'ARM:LE:32:v7' -cspec default -scriptPath $containerWork/scripts -preScript MapCtrCodeSet.java $mapperArgs -preScript SeedCtrCodeSetSymbols.java $containerWork/input/manifest.structure.json -postScript ExportCtrStructureJson.java -deleteProject" 2>&1
+    $raw = docker exec $Container bash -lc "/opt/ghidra/support/analyzeHeadless $containerWork/proj export -import $containerWork/input/input.code -processor 'ARM:LE:32:v7' -cspec default -scriptPath $containerWork/scripts -preScript MapCtrCodeSet.java $mapperArgs -preScript SeedCtrCodeSetSymbols.java $containerWork/input/manifest.structure.json -postScript ApplyCtrAnalyzerPreset.java -postScript ExportCtrStructureJson.java -deleteProject" 2>&1
     $raw | Out-File -FilePath $headlessLog -Encoding utf8
     if ($LASTEXITCODE -ne 0) {
         throw "analyzeHeadless failed; see $headlessLog"

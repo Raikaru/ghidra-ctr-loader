@@ -242,13 +242,21 @@ class CtrCodeSetLoader : AbstractLibrarySupportLoader() {
             namedDependencies++
         }
 
+        var namedServices = 0
+        for (service in serviceAccess) {
+            val safeService = service.replace(Regex("[^A-Za-z0-9_]"), "_")
+            program.externalManager.addExternalLibraryName("3ds_srv_$safeService", SourceType.ANALYSIS)
+            namedServices++
+        }
+
         val svcComments = annotateSvcCalls(program)
         val info = program.getOptions(Program.PROGRAM_INFO)
         info.setLong("3DS Named Dependency Count", namedDependencies.toLong())
+        info.setLong("3DS Named Service Access Count", namedServices.toLong())
         info.setLong("3DS Service Access Count", serviceAccess.size.toLong())
         info.setString("3DS Service Access", serviceAccess.joinToString(","))
         info.setLong("3DS SVC Comments", svcComments.toLong())
-        log.appendMsg("Applied 3DS SDK metadata ($namedDependencies dependency names, ${serviceAccess.size} service ACL entries, $svcComments SVC comments)")
+        log.appendMsg("Applied 3DS SDK metadata ($namedDependencies dependency names, $namedServices service libraries, ${serviceAccess.size} service ACL entries, $svcComments SVC comments)")
     }
 
     private fun annotateSvcCalls(program: Program): Int {

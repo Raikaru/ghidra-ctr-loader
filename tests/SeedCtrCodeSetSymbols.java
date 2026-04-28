@@ -83,7 +83,7 @@ public class SeedCtrCodeSetSymbols extends GhidraScript {
         label(addr(bss.get("address_value").getAsLong()), "ctr_bss_start");
 
         int namedDependencies = seedDependencyLibraries(manifest);
-        int serviceAccess = writeServiceAccessMetadata(manifest);
+        int serviceAccess = seedServiceAccessLibraries(manifest);
         int svcComments = annotateSvcCalls();
         println("Seeded 3DS SDK metadata: " + namedDependencies + " dependency names, " + serviceAccess + " service ACL entries, " + svcComments + " SVC comments");
     }
@@ -126,7 +126,7 @@ public class SeedCtrCodeSetSymbols extends GhidraScript {
         return count;
     }
 
-    private int writeServiceAccessMetadata(JsonObject manifest) {
+    private int seedServiceAccessLibraries(JsonObject manifest) throws Exception {
         if (!manifest.has("service_access") || !manifest.get("service_access").isJsonArray()) {
             return 0;
         }
@@ -143,14 +143,30 @@ public class SeedCtrCodeSetSymbols extends GhidraScript {
                 names.append(",");
             }
             names.append(name);
+            currentProgram.getExternalManager().addExternalLibraryName("3ds_srv_" + safeServiceName(name), SourceType.ANALYSIS);
             count++;
         }
 
         currentProgram.getOptions(ghidra.program.model.listing.Program.PROGRAM_INFO)
             .setLong("3DS Service Access Count", count);
         currentProgram.getOptions(ghidra.program.model.listing.Program.PROGRAM_INFO)
+            .setLong("3DS Named Service Access Count", count);
+        currentProgram.getOptions(ghidra.program.model.listing.Program.PROGRAM_INFO)
             .setString("3DS Service Access", names.toString());
         return count;
+    }
+
+    private String safeServiceName(String name) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+                out.append(c);
+            } else {
+                out.append('_');
+            }
+        }
+        return out.toString();
     }
 
     private int annotateSvcCalls() throws Exception {
