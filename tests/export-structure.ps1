@@ -18,6 +18,15 @@ param(
     [string] $OutDir = "",
 
     [Parameter(Mandatory=$false)]
+    [string] $ImportExtension = "",
+
+    [Parameter(Mandatory=$false)]
+    [string] $Processor = "",
+
+    [Parameter(Mandatory=$false)]
+    [string] $Compiler = "",
+
+    [Parameter(Mandatory=$false)]
     [string] $Container = "ghidra-mcp"
 )
 
@@ -47,13 +56,28 @@ $headlessLog = Join-Path $OutDir "$safeStem.headless.log"
 try {
     docker exec $Container bash -lc "rm -rf $containerWork && mkdir -p $containerWork/scripts $containerWork/input $containerWork/proj" | Out-Null
     docker cp (Join-Path $RepoRoot "tests\ExportCtrStructureJson.java") "${Container}:$containerWork/scripts/" | Out-Null
-    $inputName = "input$([IO.Path]::GetExtension($InputPath))"
-    if ([string]::IsNullOrWhiteSpace([IO.Path]::GetExtension($InputPath))) {
+    $extension = [IO.Path]::GetExtension($InputPath)
+    if (-not [string]::IsNullOrWhiteSpace($ImportExtension)) {
+        $extension = $ImportExtension
+        if (-not $extension.StartsWith(".")) {
+            $extension = ".$extension"
+        }
+    }
+    $inputName = "input$extension"
+    if ([string]::IsNullOrWhiteSpace($extension)) {
         $inputName = "input.bin"
     }
     docker cp $InputPath "${Container}:$containerWork/input/$inputName" | Out-Null
 
-    $raw = docker exec $Container bash -lc "/opt/ghidra/support/analyzeHeadless $containerWork/proj export -import $containerWork/input/$inputName -scriptPath $containerWork/scripts -postScript ExportCtrStructureJson.java -deleteProject" 2>&1
+    $importArgs = ""
+    if (-not [string]::IsNullOrWhiteSpace($Processor)) {
+        $importArgs += " -processor '$Processor'"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Compiler)) {
+        $importArgs += " -cspec '$Compiler'"
+    }
+
+    $raw = docker exec $Container bash -lc "/opt/ghidra/support/analyzeHeadless $containerWork/proj export -import $containerWork/input/$inputName$importArgs -scriptPath $containerWork/scripts -postScript ExportCtrStructureJson.java -deleteProject" 2>&1
     $raw | Out-File -FilePath $headlessLog -Encoding utf8
     if ($LASTEXITCODE -ne 0) {
         throw "analyzeHeadless failed; see $headlessLog"
