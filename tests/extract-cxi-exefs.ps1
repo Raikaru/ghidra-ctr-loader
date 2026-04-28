@@ -107,6 +107,20 @@ function Expand-CodeLzss([byte[]] $Code) {
     return $dec
 }
 
+function Read-CodeSetInfo([IO.BinaryReader] $Reader, [int64] $Offset) {
+    $Reader.BaseStream.Position = $Offset
+    $address = $Reader.ReadUInt32()
+    $physicalPages = $Reader.ReadUInt32()
+    $size = $Reader.ReadUInt32()
+    return [pscustomobject]@{
+        address = ("0x{0:x8}" -f $address)
+        address_value = $address
+        physical_pages = $physicalPages
+        physical_size = $physicalPages * 0x1000L
+        size = $size
+    }
+}
+
 $fs = [IO.File]::OpenRead($InputPath)
 $br = [IO.BinaryReader]::new($fs)
 try {
@@ -119,6 +133,12 @@ try {
     $fs.Position = 0x20d
     $exheaderFlags = $br.ReadByte()
     $codeCompressed = (($exheaderFlags -band 0x1) -ne 0)
+
+    $textCodeSet = Read-CodeSetInfo $br 0x210
+    $rodataCodeSet = Read-CodeSetInfo $br 0x220
+    $dataCodeSet = Read-CodeSetInfo $br 0x230
+    $fs.Position = 0x23c
+    $bssSize = $br.ReadUInt32()
 
     $fs.Position = 0x1a0
     $exefsOffsetMedia = $br.ReadUInt32()
@@ -163,6 +183,16 @@ try {
         exefs_offset = ("0x{0:x}" -f $exefsOffset)
         exefs_size = ("0x{0:x}" -f $exefsSize)
         code_compressed = $codeCompressed
+        code_set = [pscustomobject]@{
+            text = $textCodeSet
+            rodata = $rodataCodeSet
+            data = $dataCodeSet
+            bss = [pscustomobject]@{
+                address = ("0x{0:x8}" -f ($dataCodeSet.address_value + $dataCodeSet.size))
+                address_value = $dataCodeSet.address_value + $dataCodeSet.size
+                size = $bssSize
+            }
+        }
         files = @($entries | ForEach-Object {
             $safeName = $_.Name -replace '[^A-Za-z0-9_.-]', '_'
             $outPath = Join-Path $OutDir $safeName

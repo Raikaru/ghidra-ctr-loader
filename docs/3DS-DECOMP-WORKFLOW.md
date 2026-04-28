@@ -30,7 +30,16 @@ for decrypted local 3DS executables/modules only.
    ```
 
    The extractor decompresses `.code` when the NCCH ExHeader marks it
-   compressed. Then import `.code` as raw ARM if needed:
+   compressed and writes a payload-free code-set manifest. Prefer the
+   code-set-aware export for `.code` validation:
+
+   ```powershell
+   .\tests\export-code-set-structure.ps1 `
+     -CodePath ".local-test\exefs\game\.code" `
+     -ManifestPath ".local-test\exefs\game\manifest.structure.json"
+   ```
+
+   For a quick raw baseline, import `.code` as ARM:
 
    ```powershell
    .\tests\export-structure.ps1 `
