@@ -89,7 +89,7 @@ public class MapCtrCodeSet extends GhidraScript {
         if (size == 0) {
             return offset + consumed;
         }
-        if (offset + consumed > code.length) {
+        if (offset + size > code.length) {
             throw new IllegalStateException(name + " exceeds decompressed .code size");
         }
 

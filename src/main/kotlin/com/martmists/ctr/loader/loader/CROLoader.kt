@@ -62,7 +62,7 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
         createSegments(program, provider, monitor, log)
         declareImportsAndExports(program, provider, monitor, log)
         setLabels(program, provider, monitor)
-        applyPatches(program, provider)
+        applyPatches(program, provider, log)
     }
 
     protected open fun createDataTypes(program: Program) {
@@ -238,7 +238,7 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
         }
     }
 
-    protected open fun applyPatches(program: Program, provider: ByteProvider) {
+    protected open fun applyPatches(program: Program, provider: ByteProvider, log: MessageLog) {
         provider.getInputStream(0).reader {
             val header = read<CRO0Header>()
             requireProviderRange(provider, header.segmentTableOffset.toLong(), header.segmentTableNum * 12L, "segment table")
@@ -248,6 +248,8 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
             val segments = readList<CRO0Header.SegmentTableEntry>(header.segmentTableNum)
 
             seek(header.relocationPatchesOffset)
+            var applied = 0
+            var warnings = 0
             for (patch in readList<CRO0Header.PatchEntry>(header.relocationPatchesNum)) {
                 val (segment, offset) = patch.segmentOffset.segOff
 
@@ -261,12 +263,14 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
                     val target = targetBlock.start.add(patch.addend.toLong())
 
                     if (target > targetBlock.end) {
-                        println("WARNING: Target address ($target) for patch ($patchAddress:${patch.addend.hex}) is outside of segment $targetSegment:${targetBlock.start}-${targetBlock.end}. This may cause issues in analysis!")
+                        warnings++
+                        log.appendMsg("WARNING: Target address ($target) for patch ($patchAddress:${patch.addend.hex}) is outside of segment $targetSegment:${targetBlock.start}-${targetBlock.end}.")
                     }
                     target
                 } catch (e: NullPointerException) {
                     val target = program.addressFactory.getConstantAddress((segments.first { it.id == targetSegment.toInt() }.offset + patch.addend).toLong())
-                    println("WARNING: Target address ($target) for patch ($patchAddress:${patch.addend.hex}) points to segment $targetSegment but is missing. This may cause issues in analysis!")
+                    warnings++
+                    log.appendMsg("WARNING: Target address ($target) for patch ($patchAddress:${patch.addend.hex}) points to segment $targetSegment but is missing.")
                     target
                 }
 
@@ -286,7 +290,11 @@ open class CROLoader : AbstractLibrarySupportLoader(), CROUtilities {
                 }
 
                 program.memory.setBytes(patchAddress, arr)
+                applied++
             }
+            program.getOptions(Program.PROGRAM_INFO).setLong("CRO Relocations Applied", applied.toLong())
+            program.getOptions(Program.PROGRAM_INFO).setLong("CRO Relocation Warnings", warnings.toLong())
+            log.appendMsg("Applied $applied CRO relocation patches ($warnings warnings)")
         }
     }
 }

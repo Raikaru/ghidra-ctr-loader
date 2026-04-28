@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //
-// Headless smoke helper for synthetic CXI fixtures. It mounts a local CXI,
-// imports /exefs/code.bin through the code-set loader, and prints the loader
-// log without emitting any payload bytes.
+// Headless smoke helper for synthetic CXI/CIA fixtures. It mounts a local
+// container, imports /exefs/code.bin through the code-set loader, and prints
+// the loader log without emitting any payload bytes.
 //
 // @category CTR
 
@@ -24,7 +24,7 @@ public class ImportCxiCodeSetFixture extends GhidraScript {
 	public void run() throws Exception {
 		String[] args = getScriptArgs();
 		if (args.length != 1) {
-			throw new IllegalArgumentException("Usage: ImportCxiCodeSetFixture.java <synthetic.cxi>");
+			throw new IllegalArgumentException("Usage: ImportCxiCodeSetFixture.java <synthetic.cxi|synthetic.cia>");
 		}
 
 		FileSystemService fsService = FileSystemService.getInstance();
