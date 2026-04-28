@@ -67,38 +67,40 @@ class CXIFileSystem(private val fsFSRL: FSRLRoot, private var provider: ByteProv
                 }
             }
 
-            seek(ncch.romfsOffset.mediaUnits + 0x1000)
-            val level3HeaderStart = tell()
-            val level3Header = read<IVFCHeader.Level3Header>()
+            if (ncch.romfsOffset != 0 && ncch.romfsSize != 0) {
+                seek(ncch.romfsOffset.mediaUnits + 0x1000)
+                val level3HeaderStart = tell()
+                val level3Header = read<IVFCHeader.Level3Header>()
 
-            seek(level3HeaderStart + level3Header.directoryMetaTableOffset)
-            val rootDirectory = read<IVFCHeader.Level3Header.DirectoryMetadata>()
+                seek(level3HeaderStart + level3Header.directoryMetaTableOffset)
+                val rootDirectory = read<IVFCHeader.Level3Header.DirectoryMetadata>()
 
-            fun addFilesRecursively(parentPath: String, folder: IVFCHeader.Level3Header.DirectoryMetadata) {
-                var childDirOffset = folder.childDirectoryOffset
-                while (childDirOffset != -1) {
-                    seek(level3HeaderStart + level3Header.directoryMetaTableOffset + childDirOffset)
-                    val child = read<IVFCHeader.Level3Header.DirectoryMetadata>()
-                    addFilesRecursively("$parentPath/${folder.name.stripNulls()}", child)
-                    childDirOffset = child.siblingOffset
+                fun addFilesRecursively(parentPath: String, folder: IVFCHeader.Level3Header.DirectoryMetadata) {
+                    var childDirOffset = folder.childDirectoryOffset
+                    while (childDirOffset != -1) {
+                        seek(level3HeaderStart + level3Header.directoryMetaTableOffset + childDirOffset)
+                        val child = read<IVFCHeader.Level3Header.DirectoryMetadata>()
+                        addFilesRecursively("$parentPath/${folder.name.stripNulls()}", child)
+                        childDirOffset = child.siblingOffset
+                    }
+
+                    var childFileOffset = folder.childFileOffset
+                    while (childFileOffset != -1) {
+                        seek(level3HeaderStart + level3Header.fileMetaTableOffset + childFileOffset)
+                        val file = read<IVFCHeader.Level3Header.FileMetadata>()
+                        fsih.storeFile(
+                            "$parentPath/${folder.name.stripNulls()}/${file.name.stripNulls()}",
+                            fileCount++,
+                            false,
+                            file.dataSize,
+                            Metadata(ncch, ncchEx, file),
+                        )
+                        childFileOffset = file.siblingOffset
+                    }
                 }
 
-                var childFileOffset = folder.childFileOffset
-                while (childFileOffset != -1) {
-                    seek(level3HeaderStart + level3Header.fileMetaTableOffset + childFileOffset)
-                    val file = read<IVFCHeader.Level3Header.FileMetadata>()
-                    fsih.storeFile(
-                        "$parentPath/${folder.name.stripNulls()}/${file.name.stripNulls()}",
-                        fileCount++,
-                        false,
-                        file.dataSize,
-                        Metadata(ncch, ncchEx, file),
-                    )
-                    childFileOffset = file.siblingOffset
-                }
+                addFilesRecursively("/romfs", rootDirectory)
             }
-
-            addFilesRecursively("/romfs", rootDirectory)
         }
     }
 
