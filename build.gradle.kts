@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.martmists"
-version = "1.2.0"
+version = "1.3.0"
 
 val fp = File(projectDir, "gradle-local.properties")
 if (fp.exists()) {
@@ -44,7 +44,10 @@ tasks {
             ".local-test/",
             "**/.local-test/**",
             "gradle/",
+            "ghidra/",
+            "ghidra/**",
             "dist/",
+            "ghidra.zip",
             "*.kts",
             "gradle*.properties",
             "*.cxi",
