@@ -48,7 +48,38 @@ for decrypted local 3DS executables/modules only.
      -Compiler default
    ```
 
-7. Run a payload-free structure export:
+7. Create a persistent mapped Ghidra project when you are ready to inspect or
+   decompile locally:
+
+   ```powershell
+   .\tests\create-code-set-project.ps1 `
+     -CodePath ".local-test\exefs\game\.code" `
+     -ManifestPath ".local-test\exefs\game\manifest.structure.json" `
+     -ProjectName "game-code-set"
+   ```
+
+8. Summarize analysis warnings from any headless run:
+
+   ```powershell
+   .\tests\summarize-headless-log.ps1 `
+     -LogPath ".local-test\structure-export\game.headless.log"
+   ```
+
+9. List RomFS metadata without extracting file payload:
+
+   ```powershell
+   .\tests\list-cxi-romfs.ps1 -InputPath "C:\path\to\local\decrypted.cxi"
+   ```
+
+10. Check ExeFS/RomFS manifests for CRO/CRS modules:
+
+   ```powershell
+   .\tests\find-ctr-modules.ps1 `
+     -ExeFsManifest ".local-test\exefs\game\manifest.structure.json" `
+     -RomFsManifest ".local-test\romfs-list\game.romfs.structure.json"
+   ```
+
+11. Run a payload-free structure export:
 
    ```powershell
    .\tests\export-structure.ps1 -InputPath "C:\path\to\local\decrypted.cxi"
@@ -64,7 +95,7 @@ for decrypted local 3DS executables/modules only.
      -ImportExtension .cxi
    ```
 
-8. Compare memory blocks, functions, symbols, and external libraries against
+12. Compare memory blocks, functions, symbols, and external libraries against
    previous local runs:
 
    ```powershell
