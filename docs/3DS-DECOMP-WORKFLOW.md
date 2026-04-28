@@ -36,8 +36,15 @@ for decrypted local 3DS executables/modules only.
    ```powershell
    .\tests\export-code-set-structure.ps1 `
      -CodePath ".local-test\exefs\game\.code" `
-     -ManifestPath ".local-test\exefs\game\manifest.structure.json"
+     -ManifestPath ".local-test\exefs\game\manifest.structure.json" `
+     -InitializeBss `
+     -DisableSwitchAnalysis
    ```
+
+   `-InitializeBss` maps BSS as zero-filled initialized bytes for analysis
+   ergonomics. `-DisableSwitchAnalysis` turns off Ghidra's decompiler switch
+   analyzer, which can produce large warning logs from speculative jump-table
+   reads on these 3DS binaries.
 
    For a quick raw baseline, import `.code` as ARM:
 
@@ -55,7 +62,9 @@ for decrypted local 3DS executables/modules only.
    .\tests\create-code-set-project.ps1 `
      -CodePath ".local-test\exefs\game\.code" `
      -ManifestPath ".local-test\exefs\game\manifest.structure.json" `
-     -ProjectName "game-code-set"
+     -ProjectName "game-code-set" `
+     -InitializeBss `
+     -DisableSwitchAnalysis
    ```
 
 8. Summarize analysis warnings from any headless run:

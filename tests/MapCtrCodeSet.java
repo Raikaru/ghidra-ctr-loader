@@ -21,7 +21,20 @@ public class MapCtrCodeSet extends GhidraScript {
     public void run() throws Exception {
         String[] args = getScriptArgs();
         if (args.length < 1) {
-            throw new IllegalArgumentException("Usage: MapCtrCodeSet.java <manifest.structure.json>");
+            throw new IllegalArgumentException("Usage: MapCtrCodeSet.java <manifest.structure.json> [--init-bss] [--disable-switch-analysis]");
+        }
+        boolean initializeBss = false;
+        boolean disableSwitchAnalysis = false;
+        for (String arg : args) {
+            if ("--init-bss".equals(arg)) {
+                initializeBss = true;
+            }
+            if ("--disable-switch-analysis".equals(arg)) {
+                disableSwitchAnalysis = true;
+            }
+        }
+        if (disableSwitchAnalysis) {
+            setAnalysisOption(currentProgram, "Decompiler Switch Analysis", "false");
         }
 
         JsonObject manifest = JsonParser.parseString(Files.readString(Paths.get(args[0]))).getAsJsonObject();
@@ -57,12 +70,13 @@ public class MapCtrCodeSet extends GhidraScript {
 
         long bssSize = bss.get("size").getAsLong();
         if (bssSize > 0) {
-            MemoryBlock block = currentProgram.getMemory().createUninitializedBlock(
-                ".bss",
-                addr(bss.get("address_value").getAsLong()),
-                bssSize,
-                false
-            );
+            Address bssAddress = addr(bss.get("address_value").getAsLong());
+            MemoryBlock block;
+            if (initializeBss) {
+                block = currentProgram.getMemory().createInitializedBlock(".bss", bssAddress, bssSize, (byte) 0, monitor, false);
+            } else {
+                block = currentProgram.getMemory().createUninitializedBlock(".bss", bssAddress, bssSize, false);
+            }
             block.setRead(true);
             block.setWrite(true);
             block.setExecute(false);
